@@ -94,20 +94,15 @@ describe('getSnapshotPaths', () => {
     expect(paths[2].params).toEqual({ date: '2026-07-24', time: '20-00' });
   });
 
-  it('includes allSamples up to each snapshot epochMs', async () => {
+  it('returns only sample in props (no allSamples)', async () => {
     mockFetch.mockResolvedValue(jsonResponse(historyBody));
 
     const paths = await getSnapshotPaths();
 
-    // First snapshot: only itself
-    expect(paths[0].props.allSamples).toHaveLength(1);
-    expect(paths[0].props.allSamples[0].hour).toBe('2026-07-24T18:00+09:00');
-
-    // Second snapshot: first + second
-    expect(paths[1].props.allSamples).toHaveLength(2);
-
-    // Third snapshot: all three
-    expect(paths[2].props.allSamples).toHaveLength(3);
+    // Each path only contains the single sample, not cumulative allSamples
+    expect(paths[0].props).toHaveProperty('sample');
+    expect(paths[0].props.sample.hour).toBe('2026-07-24T18:00+09:00');
+    expect(paths[0].props).not.toHaveProperty('allSamples');
   });
 
   it('deduplicates by hour field', async () => {

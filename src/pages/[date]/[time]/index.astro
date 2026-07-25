@@ -7,7 +7,7 @@ export async function getStaticPaths() {
 }
 
 const { date, time } = Astro.params;
-const { sample, allSamples } = Astro.props;
+const { sample } = Astro.props;
 const generatedAt = sample.ts;
 ---
 
@@ -29,7 +29,7 @@ const generatedAt = sample.ts;
       </p>
     </div>
 
-    <script is:inline type="application/json" id="snapshot-data">{JSON.stringify({ sample, allSamples, generatedAt })}</script>
+    <script is:inline type="application/json" id="snapshot-data">{JSON.stringify({ sample, generatedAt })}</script>
 
     <div id="loading" class="flex items-center gap-3 text-gray-400 py-12 justify-center">
       <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -52,11 +52,26 @@ const generatedAt = sample.ts;
 
       const data = JSON.parse(dataEl.textContent || '');
 
-      loadingEl?.classList.add('hidden');
-
       const React = await import('react');
       const ReactDOM = await import('react-dom/client');
       const { default: Dashboard } = await import('../../../components/Dashboard');
+
+      // Fetch full history client-side for timeline chart
+      let allSamples = [data.sample];
+      try {
+        const endpoint = (import.meta as any).env?.GAS_ENDPOINT;
+        if (endpoint) {
+          const res = await fetch(`${endpoint.replace(/\/+$/, '')}/history`);
+          if (res.ok) {
+            const json = await res.json();
+            allSamples = json.samples || [data.sample];
+          }
+        }
+      } catch {
+        // fallback: show only this snapshot
+      }
+
+      loadingEl?.classList.add('hidden');
 
       const container = document.createElement('div');
       rootEl.appendChild(container);
@@ -64,7 +79,7 @@ const generatedAt = sample.ts;
       const root = ReactDOM.createRoot(container);
       root.render(
         React.createElement(Dashboard, {
-          samples: data.allSamples,
+          samples: allSamples,
           generatedAt: data.generatedAt,
         })
       );

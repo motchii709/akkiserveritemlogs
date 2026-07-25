@@ -171,13 +171,14 @@ function buildManifest_() {
 }
 
 function buildLatest_() {
-  const rows = readAllRows_(null);
-  if (rows.length === 0) {
+  const all = readAllRows_(null);
+  const hourly = downsampleHourly_(all);
+  if (hourly.length === 0) {
     return { schema: SCHEMA_VERSION, generatedAt: new Date().toISOString(), latest: null };
   }
-  const sorted = rows.slice().sort((a, b) => b.epochMs - a.epochMs);
-  const latest = sorted[0];
-  const parsed = parseRawJsonSafe_(latest.raw);
+  // hourly は古い→新しい順。最後のエントリが最新
+  const latest = hourly[hourly.length - 1];
+  const parsed = parseRawJsonSafe_(latest.snapshot.raw);
   if (!parsed) {
     return { schema: SCHEMA_VERSION, generatedAt: new Date().toISOString(), latest: null };
   }
@@ -190,7 +191,7 @@ function buildLatest_() {
     generatedAt: new Date().toISOString(),
     latest: {
       ts: latest.ts,
-      hour: isoHourKey_(new Date(latest.epochMs)),
+      hour: latest.hour,
       epochMs: latest.epochMs,
       unique: unique,
       total: total,
