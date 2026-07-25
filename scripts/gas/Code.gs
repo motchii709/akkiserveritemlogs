@@ -83,11 +83,9 @@ function openSheet_() {
   const SPREADSHEET_ID = '1g4b8kBlH9-O-0UU8SdgARRHwjjUk2wGu6oD4IFAyeFw';
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   if (!ss) throw new Error('no spreadsheet accessible');
-  const sheets = ss.getSheets();
-  for (const sh of sheets) {
-    if (String(sh.getSheetId()) === String(SHEET_GID)) return sh;
-  }
-  throw new Error('sheet gid ' + SHEET_GID + ' not found');
+  const sh = ss.getSheetByName('logv2');
+  if (!sh) throw new Error('sheet "logv2" not found');
+  return sh;
 }
 
 /**
@@ -178,11 +176,27 @@ function buildLatest_() {
     return { schema: SCHEMA_VERSION, generatedAt: new Date().toISOString(), latest: null };
   }
   const sorted = rows.slice().sort((a, b) => b.epochMs - a.epochMs);
-  const sampleRows = buildSampleRows_(sorted.slice(0, 200));
+  const latest = sorted[0];
+  const parsed = parseRawJsonSafe_(latest.raw);
+  if (!parsed) {
+    return { schema: SCHEMA_VERSION, generatedAt: new Date().toISOString(), latest: null };
+  }
+  const top = topEntries_(parsed, TOP_N);
+  const modules = sumByModule_(parsed);
+  const total = sumValues_(parsed);
+  const unique = Object.keys(parsed).length;
   return {
     schema: SCHEMA_VERSION,
     generatedAt: new Date().toISOString(),
-    latest: sampleRows[0] || null,
+    latest: {
+      ts: latest.ts,
+      hour: isoHourKey_(new Date(latest.epochMs)),
+      epochMs: latest.epochMs,
+      unique: unique,
+      total: total,
+      top: top,
+      modules: modules,
+    },
   };
 }
 
