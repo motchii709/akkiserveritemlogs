@@ -1,0 +1,75 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import { getSnapshotPaths } from '../../../lib/snapshots';
+
+export async function getStaticPaths() {
+  return getSnapshotPaths();
+}
+
+const { date, time } = Astro.params;
+const { sample, allSamples } = Astro.props;
+const generatedAt = sample.ts;
+---
+
+<Layout title={`AKKISERVER Item Logs - ${date} ${time}`}>
+  <main class="container mx-auto px-4 py-8">
+    <div class="mb-4">
+      <a
+        href="/latest"
+        class="inline-flex items-center gap-1 text-sm text-blue-400 hover:underline"
+      >
+        ← 最新データに戻る
+      </a>
+    </div>
+
+    <div class="mb-6">
+      <h1 class="text-2xl font-bold">このスナップショット</h1>
+      <p class="mt-1 text-sm text-gray-400">
+        {sample.hour} のデータ
+      </p>
+    </div>
+
+    <script is:inline type="application/json" id="snapshot-data">{JSON.stringify({ sample, allSamples, generatedAt })}</script>
+
+    <div id="loading" class="flex items-center gap-3 text-gray-400 py-12 justify-center">
+      <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+      </svg>
+      <span>Loading dashboard...</span>
+    </div>
+
+    <div id="dashboard-root"></div>
+  </main>
+
+  <script>
+    async function load() {
+      const dataEl = document.getElementById('snapshot-data');
+      const loadingEl = document.getElementById('loading');
+      const rootEl = document.getElementById('dashboard-root');
+
+      if (!dataEl || !rootEl) return;
+
+      const data = JSON.parse(dataEl.textContent || '');
+
+      loadingEl?.classList.add('hidden');
+
+      const React = await import('react');
+      const ReactDOM = await import('react-dom/client');
+      const { default: Dashboard } = await import('../../../components/Dashboard');
+
+      const container = document.createElement('div');
+      rootEl.appendChild(container);
+
+      const root = ReactDOM.createRoot(container);
+      root.render(
+        React.createElement(Dashboard, {
+          samples: data.allSamples,
+          generatedAt: data.generatedAt,
+        })
+      );
+    }
+
+    load();
+  </script>
+</Layout>
