@@ -80,9 +80,8 @@ function jsonResponse(obj, status) {
  * シート取得
  */
 function openSheet_() {
-  const props = PropertiesService.getScriptProperties();
-  const id = props.getProperty('SPREADSHEET_ID');
-  const ss = id ? SpreadsheetApp.openById(id) : SpreadsheetApp.getActiveSpreadsheet();
+  const SPREADSHEET_ID = '1g4b8kBlH9-O-0UU8SdgARRHwjjUk2wGu6oD4IFAyeFw';
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   if (!ss) throw new Error('no spreadsheet accessible');
   const sheets = ss.getSheets();
   for (const sh of sheets) {
