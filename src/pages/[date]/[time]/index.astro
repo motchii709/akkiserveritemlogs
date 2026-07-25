@@ -9,9 +9,13 @@ export async function getStaticPaths() {
 const { date, time } = Astro.params;
 const { sample } = Astro.props;
 const generatedAt = sample.ts;
+const gasEndpoint = import.meta.env.GAS_ENDPOINT || (import.meta.env as any).PUBLIC_GAS_ENDPOINT || '';
 ---
 
 <Layout title={`AKKISERVER Item Logs - ${date} ${time}`}>
+  <script is:inline define:vars={{ gasEndpoint }}>
+    window.__GAS_ENDPOINT__ = gasEndpoint;
+  </script>
   <main class="container mx-auto px-4 py-8">
     <div class="mb-4">
       <a
@@ -59,7 +63,7 @@ const generatedAt = sample.ts;
       // Fetch full history client-side for timeline chart
       let allSamples = [data.sample];
       try {
-        const endpoint = (import.meta as any).env?.GAS_ENDPOINT;
+        const endpoint = (window as any).__GAS_ENDPOINT__ || (import.meta as any).env?.GAS_ENDPOINT;
         if (endpoint) {
           const res = await fetch(`${endpoint.replace(/\/+$/, '')}/history`);
           if (res.ok) {

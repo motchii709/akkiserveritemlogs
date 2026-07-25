@@ -3,7 +3,10 @@ import type { ApiResponse, LatestResponse, ManifestResponse } from './types';
 const DEFAULT_TIMEOUT_MS = 15_000;
 
 function getEndpoint(): string {
-  const endpoint = import.meta.env.GAS_ENDPOINT as string | undefined;
+  if (typeof window !== 'undefined' && (window as any).__GAS_ENDPOINT__) {
+    return (window as any).__GAS_ENDPOINT__.replace(/\/+$/, '');
+  }
+  const endpoint = (import.meta.env.GAS_ENDPOINT || (import.meta.env as any).PUBLIC_GAS_ENDPOINT) as string | undefined;
   if (!endpoint) {
     throw new Error('GAS_ENDPOINT environment variable is not set');
   }

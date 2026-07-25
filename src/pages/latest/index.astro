@@ -1,8 +1,12 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+const gasEndpoint = import.meta.env.GAS_ENDPOINT || (import.meta.env as any).PUBLIC_GAS_ENDPOINT || '';
 ---
 
 <Layout title="AKKISERVER Item Logs - Latest">
+  <script is:inline define:vars={{ gasEndpoint }}>
+    window.__GAS_ENDPOINT__ = gasEndpoint;
+  </script>
   <main class="container mx-auto px-4 py-8">
     <div id="app" class="space-y-4">
       <h1 class="text-2xl font-bold">AKKISERVER Item Logs</h1>
