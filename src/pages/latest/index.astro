@@ -8,14 +8,14 @@ let latestData: LatestResponse | null = null;
 let historyData: HourlySample[] = [];
 
 try {
-  const rawLatest = readFileSync(join(process.cwd(), 'dist/data/latest.json'), 'utf-8');
+  const rawLatest = readFileSync(join(process.cwd(), 'public/data/latest.json'), 'utf-8');
   latestData = JSON.parse(rawLatest) as LatestResponse;
 } catch {
   // data not available yet
 }
 
 try {
-  const rawHistory = readFileSync(join(process.cwd(), 'dist/data/history.json'), 'utf-8');
+  const rawHistory = readFileSync(join(process.cwd(), 'public/data/history.json'), 'utf-8');
   const parsed = JSON.parse(rawHistory) as ApiResponse;
   historyData = parsed.samples || [];
 } catch {

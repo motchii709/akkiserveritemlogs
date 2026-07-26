@@ -1,6 +1,9 @@
 # Build output
 dist/
 
+# Fetched GAS data (generated at build time)
+public/data/
+
 # Dependencies
 node_modules/
 

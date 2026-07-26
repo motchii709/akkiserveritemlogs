@@ -20,7 +20,7 @@ export function parseHourField(
 
 function readHistoryFromFile(): HourlySample[] {
   try {
-    const raw = readFileSync(join(process.cwd(), 'dist/data/history.json'), 'utf-8');
+    const raw = readFileSync(join(process.cwd(), 'public/data/history.json'), 'utf-8');
     const parsed = JSON.parse(raw) as ApiResponse;
     return parsed.samples || [];
   } catch {

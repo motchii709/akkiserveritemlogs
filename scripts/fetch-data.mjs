@@ -14,7 +14,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const args = process.argv.slice(2);
-let outputDir = 'dist/data';
+let outputDir = 'public/data';
 let endpoint = process.env.GAS_ENDPOINT || '';
 
 for (let i = 0; i < args.length; i++) {
@@ -35,7 +35,8 @@ if (!endpoint) {
 const base = endpoint.replace(/\/+$/, '');
 
 async function fetchJson(route, params) {
-  const url = new URL(`${base}/${route}`);
+  const url = new URL(base);
+  url.searchParams.set('route', route);
   if (params) {
     for (const [k, v] of Object.entries(params)) {
       if (v != null) url.searchParams.set(k, String(v));
