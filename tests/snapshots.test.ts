@@ -1,6 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { parseHourField, getSnapshotPaths } from '../src/lib/snapshots';
-import type { HourlySample } from '../src/lib/types';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { parseHourField } from '../src/lib/snapshots';
+import type { HourlySample, ApiResponse } from '../src/lib/types';
+import * as fs from 'node:fs';
+
+vi.mock('node:fs', () => ({
+  readFileSync: vi.fn(),
+}));
+
+import { getSnapshotPaths } from '../src/lib/snapshots';
 
 describe('parseHourField', () => {
   it('parses standard ISO hour field with +09:00 offset', () => {
@@ -49,97 +56,69 @@ function makeSample(hour: string, ts: string, epochMs: number): HourlySample {
   };
 }
 
+const historyBody: ApiResponse = {
+  schema: 1,
+  generatedAt: '2026-07-24T21:00:00Z',
+  granularity: 'hourly',
+  since: null,
+  count: 3,
+  samples: [
+    makeSample('2026-07-24T18:00+09:00', '2026/07/24 18:00:01', 1753363200000),
+    makeSample('2026-07-24T19:00+09:00', '2026/07/24 19:00:01', 1753366800000),
+    makeSample('2026-07-24T20:00+09:00', '2026/07/24 20:00:01', 1753370400000),
+  ],
+};
+
 describe('getSnapshotPaths', () => {
-  const mockFetch = vi.fn();
-  vi.stubGlobal('fetch', mockFetch);
+  const mockReadFile = vi.mocked(fs.readFileSync);
 
   beforeEach(() => {
-    vi.stubEnv('GAS_ENDPOINT', 'https://example.com/gas');
-    mockFetch.mockReset();
+    mockReadFile.mockReset();
   });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  function jsonResponse(data: unknown, status = 200): Response {
-    return new Response(JSON.stringify(data), {
-      status,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
-  const historyBody = {
-    schema: 1,
-    generatedAt: '2026-07-24T21:00:00Z',
-    granularity: 'hourly',
-    since: null,
-    count: 3,
-    samples: [
-      makeSample('2026-07-24T18:00+09:00', '2026/07/24 18:00:01', 1753363200000),
-      makeSample('2026-07-24T19:00+09:00', '2026/07/24 19:00:01', 1753366800000),
-      makeSample('2026-07-24T20:00+09:00', '2026/07/24 20:00:01', 1753370400000),
-    ],
-  };
 
   it('returns paths for each hourly snapshot', async () => {
-    mockFetch.mockResolvedValue(jsonResponse(historyBody));
-
+    mockReadFile.mockReturnValue(JSON.stringify(historyBody));
     const paths = await getSnapshotPaths();
     expect(paths).toHaveLength(3);
-
-    // Sorted by epochMs — check params
     expect(paths[0].params).toEqual({ date: '2026-07-24', time: '18-00' });
     expect(paths[1].params).toEqual({ date: '2026-07-24', time: '19-00' });
     expect(paths[2].params).toEqual({ date: '2026-07-24', time: '20-00' });
   });
 
   it('returns only sample in props (no allSamples)', async () => {
-    mockFetch.mockResolvedValue(jsonResponse(historyBody));
-
+    mockReadFile.mockReturnValue(JSON.stringify(historyBody));
     const paths = await getSnapshotPaths();
-
-    // Each path only contains the single sample, not cumulative allSamples
     expect(paths[0].props).toHaveProperty('sample');
     expect(paths[0].props.sample.hour).toBe('2026-07-24T18:00+09:00');
     expect(paths[0].props).not.toHaveProperty('allSamples');
   });
 
   it('deduplicates by hour field', async () => {
-    const body = {
+    const body: ApiResponse = {
       ...historyBody,
       samples: [
         makeSample('2026-07-24T18:00+09:00', '2026/07/24 18:00:01', 1753363200000),
         makeSample('2026-07-24T18:00+09:00', '2026/07/24 18:30:00', 1753365000000),
       ],
     };
-    mockFetch.mockResolvedValue(jsonResponse(body));
-
+    mockReadFile.mockReturnValue(JSON.stringify(body));
     const paths = await getSnapshotPaths();
     expect(paths).toHaveLength(1);
-    // The later sample wins
     expect(paths[0].props.sample.ts).toBe('2026/07/24 18:30:00');
   });
 
-  it('returns empty array on fetch failure', async () => {
-    mockFetch.mockRejectedValue(new Error('network fail'));
-
-    const paths = await getSnapshotPaths();
-    expect(paths).toEqual([]);
-  });
-
-  it('returns empty array on non-ok response', async () => {
-    mockFetch.mockResolvedValue(new Response('error', { status: 500 }));
-
+  it('returns empty array on file read failure', async () => {
+    mockReadFile.mockImplementation(() => {
+      throw new Error('ENOENT');
+    });
     const paths = await getSnapshotPaths();
     expect(paths).toEqual([]);
   });
 
   it('returns empty array when no samples', async () => {
-    mockFetch.mockResolvedValue(
-      jsonResponse({ ...historyBody, samples: [], count: 0 }),
+    mockReadFile.mockReturnValue(
+      JSON.stringify({ ...historyBody, samples: [], count: 0 }),
     );
-
     const paths = await getSnapshotPaths();
     expect(paths).toEqual([]);
   });

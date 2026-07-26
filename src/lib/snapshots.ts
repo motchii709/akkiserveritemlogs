@@ -1,5 +1,6 @@
-import type { HourlySample } from './types';
-import { fetchHistory } from './api';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import type { HourlySample, ApiResponse } from './types';
 
 interface SnapshotPath {
   params: { date: string; time: string };
@@ -17,32 +18,40 @@ export function parseHourField(
   };
 }
 
-export async function getSnapshotPaths(): Promise<SnapshotPath[]> {
+function readHistoryFromFile(): HourlySample[] {
   try {
-    const res = await fetchHistory();
-    const samples = res.samples;
-
-    const hourlyMap = new Map<string, HourlySample>();
-    for (const s of samples) {
-      hourlyMap.set(s.hour, s);
-    }
-
-    const result: SnapshotPath[] = [];
-    for (const [, sample] of hourlyMap) {
-      const parsed = parseHourField(sample.hour);
-      if (!parsed) continue;
-      result.push({
-        params: { date: parsed.date, time: parsed.time },
-        props: { sample },
-      });
-    }
-
-    return result;
+    const raw = readFileSync(join(process.cwd(), 'dist/data/history.json'), 'utf-8');
+    const parsed = JSON.parse(raw) as ApiResponse;
+    return parsed.samples || [];
   } catch {
+    return [];
+  }
+}
+
+export async function getSnapshotPaths(): Promise<SnapshotPath[]> {
+  const samples = readHistoryFromFile();
+  if (samples.length === 0) {
     console.warn(
-      'snapshots: Failed to fetch history for static paths. ' +
+      'snapshots: No history data found. ' +
         'Returning empty array — no historical pages will be generated.',
     );
     return [];
   }
+
+  const hourlyMap = new Map<string, HourlySample>();
+  for (const s of samples) {
+    hourlyMap.set(s.hour, s);
+  }
+
+  const result: SnapshotPath[] = [];
+  for (const [, sample] of hourlyMap) {
+    const parsed = parseHourField(sample.hour);
+    if (!parsed) continue;
+    result.push({
+      params: { date: parsed.date, time: parsed.time },
+      props: { sample },
+    });
+  }
+
+  return result;
 }

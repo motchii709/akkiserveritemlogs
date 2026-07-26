@@ -1,116 +1,90 @@
 ---
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import Layout from '../../layouts/Layout.astro';
-const gasEndpoint = import.meta.env.GAS_ENDPOINT || (import.meta.env as any).PUBLIC_GAS_ENDPOINT || '';
+import type { LatestResponse, ApiResponse, HourlySample } from '../../lib/types';
+
+let latestData: LatestResponse | null = null;
+let historyData: HourlySample[] = [];
+
+try {
+  const rawLatest = readFileSync(join(process.cwd(), 'dist/data/latest.json'), 'utf-8');
+  latestData = JSON.parse(rawLatest) as LatestResponse;
+} catch {
+  // data not available yet
+}
+
+try {
+  const rawHistory = readFileSync(join(process.cwd(), 'dist/data/history.json'), 'utf-8');
+  const parsed = JSON.parse(rawHistory) as ApiResponse;
+  historyData = parsed.samples || [];
+} catch {
+  // data not available yet
+}
+
+const latest = latestData?.latest ?? null;
+const generatedAt = latestData?.generatedAt ?? new Date().toISOString();
+const latestSamples = latest ? [latest] : [];
+const allSamples = historyData.length > 0 ? historyData : latestSamples;
 ---
 
 <Layout title="AKKISERVER Item Logs - Latest">
-  <script is:inline define:vars={{ gasEndpoint }}>
-    window.__GAS_ENDPOINT__ = gasEndpoint;
-  </script>
   <main class="container mx-auto px-4 py-8">
     <div id="app" class="space-y-4">
       <h1 class="text-2xl font-bold">AKKISERVER Item Logs</h1>
 
-      <!-- Loading state -->
       <div id="loading" class="flex items-center gap-3 text-gray-400 py-12 justify-center">
         <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
         </svg>
-        <span>Loading data...</span>
+        <span>Loading dashboard...</span>
       </div>
 
-      <!-- Error state -->
-      <div id="error" class="hidden rounded-2xl border border-red-800 bg-red-900/30 p-6 text-red-300">
-        <p class="font-semibold">Failed to load data</p>
-        <p id="error-msg" class="mt-1 text-sm text-red-400"></p>
-        <button
-          id="retry-btn"
-          class="mt-3 rounded-lg bg-red-800/50 px-4 py-1.5 text-sm hover:bg-red-800"
-        >
-          Retry
-        </button>
-      </div>
+      {latest && (
+        <script is:inline type="application/json" id="dashboard-data" set:html={JSON.stringify({ samples: allSamples, generatedAt })} />
+      )}
 
-      <!-- Dashboard mount point -->
       <div id="dashboard-root"></div>
+
+      {!latest && (
+        <div class="rounded-2xl border border-gray-800 bg-gray-900/70 p-8 text-center">
+          <p class="text-gray-400">No data available yet.</p>
+        </div>
+      )}
     </div>
   </main>
 
-  <script>
-    import { fetchLatest } from '../../lib/api';
-    import { fetchHistory } from '../../lib/api';
+  {latest && (
+    <script>
+      async function load() {
+        const dataEl = document.getElementById('dashboard-data');
+        const loadingEl = document.getElementById('loading');
+        const rootEl = document.getElementById('dashboard-root');
 
-    async function load() {
-      const loadingEl = document.getElementById('loading');
-      const errorEl = document.getElementById('error');
-      const errorMsgEl = document.getElementById('error-msg');
-      const rootEl = document.getElementById('dashboard-root');
+        if (!dataEl || !rootEl) return;
 
-      loadingEl?.classList.remove('hidden');
-      errorEl?.classList.add('hidden');
-      rootEl!.innerHTML = '';
-
-      try {
-        // Fetch latest snapshot
-        const latestRes = await fetchLatest();
-
-        // Fetch history for charts
-        let historySamples: Array<{
-          ts: string;
-          hour: string;
-          epochMs: number;
-          unique: number;
-          total: number;
-          top: Array<{ item: string; qty: number }>;
-          modules: Record<string, number>;
-        }> = [];
-
-        if (latestRes.latest) {
-          // Fetch last 24 hours of history
-          const since = new Date(
-            Date.now() - 24 * 60 * 60 * 1000
-          ).toISOString();
-          const historyRes = await fetchHistory(since);
-          historySamples = historyRes.samples;
-        }
+        const data = JSON.parse(dataEl.textContent || '');
 
         loadingEl?.classList.add('hidden');
 
-        if (!latestRes.latest) {
-          rootEl!.innerHTML = `
-            <div class="rounded-2xl border border-gray-800 bg-gray-900/70 p-8 text-center">
-              <p class="text-gray-400">No data available yet.</p>
-            </div>`;
-          return;
-        }
-
-        // Render the Dashboard React component
         const React = await import('react');
         const ReactDOM = await import('react-dom/client');
         const { default: Dashboard } = await import('../../components/Dashboard');
 
         const container = document.createElement('div');
-        rootEl!.appendChild(container);
+        rootEl.appendChild(container);
 
         const root = ReactDOM.createRoot(container);
         root.render(
           React.createElement(Dashboard, {
-            samples: historySamples.length > 0 ? historySamples : [latestRes.latest],
-            generatedAt: latestRes.generatedAt,
+            samples: data.samples,
+            generatedAt: data.generatedAt,
           })
         );
-      } catch (err) {
-        loadingEl?.classList.add('hidden');
-        errorEl?.classList.remove('hidden');
-        errorMsgEl!.textContent =
-          err instanceof Error ? err.message : String(err);
       }
-    }
 
-    document.getElementById('retry-btn')?.addEventListener('click', load);
-
-    // Initial load
-    load();
-  </script>
+      load();
+    </script>
+  )}
 </Layout>

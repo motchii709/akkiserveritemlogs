@@ -1,6 +1,9 @@
 ---
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import Layout from '../../../layouts/Layout.astro';
 import { getSnapshotPaths } from '../../../lib/snapshots';
+import type { ApiResponse, HourlySample } from '../../../lib/types';
 
 export async function getStaticPaths() {
   return getSnapshotPaths();
@@ -9,13 +12,19 @@ export async function getStaticPaths() {
 const { date, time } = Astro.params;
 const { sample } = Astro.props;
 const generatedAt = sample.ts;
-const gasEndpoint = import.meta.env.GAS_ENDPOINT || (import.meta.env as any).PUBLIC_GAS_ENDPOINT || '';
+
+// Read full history from file at build time
+let allSamples: HourlySample[] = [];
+try {
+  const raw = readFileSync(join(process.cwd(), 'dist/data/history.json'), 'utf-8');
+  const parsed = JSON.parse(raw) as ApiResponse;
+  allSamples = parsed.samples || [];
+} catch {
+  // data not available
+}
 ---
 
 <Layout title={`AKKISERVER Item Logs - ${date} ${time}`}>
-  <script is:inline define:vars={{ gasEndpoint }}>
-    window.__GAS_ENDPOINT__ = gasEndpoint;
-  </script>
   <main class="container mx-auto px-4 py-8">
     <div class="mb-4">
       <a
@@ -33,7 +42,7 @@ const gasEndpoint = import.meta.env.GAS_ENDPOINT || (import.meta.env as any).PUB
       </p>
     </div>
 
-    <script is:inline type="application/json" id="snapshot-data">{JSON.stringify({ sample, generatedAt })}</script>
+    <script is:inline type="application/json" id="snapshot-data" set:html={JSON.stringify({ sample, allSamples, generatedAt })} />
 
     <div id="loading" class="flex items-center gap-3 text-gray-400 py-12 justify-center">
       <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -56,26 +65,11 @@ const gasEndpoint = import.meta.env.GAS_ENDPOINT || (import.meta.env as any).PUB
 
       const data = JSON.parse(dataEl.textContent || '');
 
+      loadingEl?.classList.add('hidden');
+
       const React = await import('react');
       const ReactDOM = await import('react-dom/client');
       const { default: Dashboard } = await import('../../../components/Dashboard');
-
-      // Fetch full history client-side for timeline chart
-      let allSamples = [data.sample];
-      try {
-        const endpoint = (window as any).__GAS_ENDPOINT__ || (import.meta as any).env?.GAS_ENDPOINT;
-        if (endpoint) {
-          const res = await fetch(`${endpoint.replace(/\/+$/, '')}/history`);
-          if (res.ok) {
-            const json = await res.json();
-            allSamples = json.samples || [data.sample];
-          }
-        }
-      } catch {
-        // fallback: show only this snapshot
-      }
-
-      loadingEl?.classList.add('hidden');
 
       const container = document.createElement('div');
       rootEl.appendChild(container);
@@ -83,7 +77,7 @@ const gasEndpoint = import.meta.env.GAS_ENDPOINT || (import.meta.env as any).PUB
       const root = ReactDOM.createRoot(container);
       root.render(
         React.createElement(Dashboard, {
-          samples: allSamples,
+          samples: data.allSamples,
           generatedAt: data.generatedAt,
         })
       );
