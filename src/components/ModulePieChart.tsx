@@ -12,19 +12,12 @@ interface ModulePieChartProps {
   modules: Record<string, number>;
 }
 
-const COLORS = [
-  '#3b82f6',
-  '#ef4444',
-  '#10b981',
-  '#f59e0b',
-  '#8b5cf6',
-  '#06b6d4',
-  '#f97316',
-  '#ec4899',
-  '#6366f1',
-  '#14b8a6',
-  '#eab308',
-  '#d946ef',
+const PIE_COLORS = [
+  'hsl(var(--chart-1))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))',
+  'hsl(var(--chart-5))',
 ];
 
 interface ChartDataItem {
@@ -50,9 +43,9 @@ function CustomTooltip({
   const item = payload[0];
 
   return (
-    <div className="rounded-xl border border-gray-700 bg-gray-800/90 px-3 py-2 text-sm shadow-xl backdrop-blur-xs">
-      <p className="font-medium text-gray-200">{item.name}</p>
-      <p className="font-mono text-gray-400">
+    <div className="rounded-lg border border-border bg-card p-3 text-sm shadow-xl">
+      <p className="font-medium text-card-foreground">{item.name}</p>
+      <p className="font-mono text-muted-foreground">
         {item.value.toLocaleString()} items
       </p>
     </div>
@@ -82,7 +75,7 @@ export default function ModulePieChart({ modules }: ModulePieChartProps) {
     }
 
     if (otherQty > 0) {
-      main.push({ name: 'Other', value: otherQty, pct: otherQty / total });
+      main.push({ name: 'その他', value: otherQty, pct: otherQty / total });
     }
 
     return main;
@@ -90,46 +83,59 @@ export default function ModulePieChart({ modules }: ModulePieChartProps) {
 
   if (chartData.length === 0) {
     return (
-      <div className="flex h-64 items-center justify-center text-gray-500">
-        No module data
+      <div className="rounded-[var(--radius)] border border-border bg-card p-6">
+        <h2 className="text-base font-semibold text-card-foreground mb-6">
+          カテゴリ別シェア
+        </h2>
+        <div className="flex h-[360px] items-center justify-center text-muted-foreground">
+          No module data
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="rounded-2xl border border-gray-800/40 bg-gray-900/30 pt-4 pb-2 px-4 shadow-lg backdrop-blur-sm">
-      <h2 className="text-sm font-medium text-gray-300 tracking-wide">
-        Modules
+    <div className="rounded-[var(--radius)] border border-border bg-card p-6">
+      <h2 className="text-base font-semibold text-card-foreground mb-6">
+        カテゴリ別シェア
       </h2>
-      <ResponsiveContainer width="100%" height={320}>
-        <PieChart>
-          <Pie
-            data={chartData}
-            dataKey="value"
-            nameKey="name"
-            cx="50%"
-            cy="50%"
-            innerRadius="60%"
-            outerRadius="90%"
-            label={({ name, percent }: { name?: string; percent?: number }) =>
-              name && (percent ?? 0) > 0.05 ? name : ''
-            }
-            labelLine={false}
-          >
-            {chartData.map((_, i) => (
-              <Cell key={i} fill={COLORS[i % COLORS.length]} />
-            ))}
-          </Pie>
-          <Tooltip content={<CustomTooltip />} />
-          <Legend
-            layout="vertical"
-            align="right"
-            verticalAlign="middle"
-            wrapperStyle={{ fontSize: '0.75rem', color: '#9ca3af' }}
-            formatter={renderLegendText}
-          />
-        </PieChart>
-      </ResponsiveContainer>
+      <div className="h-[360px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={chartData}
+              dataKey="value"
+              nameKey="name"
+              cx="50%"
+              cy="50%"
+              innerRadius="60%"
+              outerRadius="85%"
+              label={({ name, percent }: { name?: string; percent?: number }) =>
+                name && (percent ?? 0) >= 0.05 ? name : ''
+              }
+              labelLine={false}
+            >
+              {chartData.map((_, i) => (
+                <Cell
+                  key={i}
+                  fill={PIE_COLORS[i % PIE_COLORS.length]}
+                />
+              ))}
+            </Pie>
+            <Tooltip content={<CustomTooltip />} />
+            <Legend
+              layout="vertical"
+              align="right"
+              verticalAlign="middle"
+              wrapperStyle={{
+                fontSize: '0.75rem',
+                color: 'hsl(var(--muted-foreground))',
+              }}
+              formatter={renderLegendText}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
