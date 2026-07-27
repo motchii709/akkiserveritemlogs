@@ -179,12 +179,12 @@ function buildLatest_() {
   if (hourly.length === 0) {
     return { schema: SCHEMA_VERSION, generatedAt: new Date().toISOString(), latest: null };
   }
-  const found = findLastValidParsed_(hourly);
-  if (!found) {
+  // hourly は古い→新しい順。最後のエントリが最新
+  const latest = hourly[hourly.length - 1];
+  const parsed = parseRawJsonSafe_(latest.snapshot.raw);
+  if (!parsed) {
     return { schema: SCHEMA_VERSION, generatedAt: new Date().toISOString(), latest: null };
   }
-  const latest = found.hour;
-  const parsed = found.parsed;
   const top = topEntries_(parsed, TOP_N);
   const modules = sumByModule_(parsed);
   const total = sumValues_(parsed);
@@ -204,27 +204,22 @@ function buildLatest_() {
   };
 }
 
-function findLastValidParsed_(hourly) {
-  // hourlyは古い→新しい順。末尾から有効なparsedを探す
-  for (let i = hourly.length - 1; i >= 0; i--) {
-    const p = parseRawJsonSafe_(hourly[i].snapshot.raw);
-    if (p && Object.keys(p).length > 0) return { entry: hourly[i], parsed: p };
-  }
-  return null;
-}
-
+/**
+ * 最新スナップショット + 全アイテムリストを返す
+ * アイテムを返却するのでサイズが大きい。静的ビルド専用。
+ */
 function buildLatestItems_() {
   const all = readAllRows_(null);
   const hourly = downsampleHourly_(all);
   if (hourly.length === 0) {
     return { schema: SCHEMA_VERSION, generatedAt: new Date().toISOString(), latest: null, items: {} };
   }
-  const found = findLastValidParsed_(hourly);
-  if (!found) {
+  const latest = hourly[hourly.length - 1];
+  const parsed = parseRawJsonSafe_(latest.snapshot.raw);
+  if (!parsed) {
     return { schema: SCHEMA_VERSION, generatedAt: new Date().toISOString(), latest: null, items: {} };
   }
-  const latest = found.hour;
-  const parsed = found.parsed;
+  // 全アイテムを文字列→数量のオブジェクトとして返す
   const items = {};
   for (const k of Object.keys(parsed)) {
     items[k] = Number(parsed[k]) || 0;
