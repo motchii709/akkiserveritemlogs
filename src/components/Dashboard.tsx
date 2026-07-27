@@ -1,32 +1,39 @@
-import type { HourlySample } from '../lib/types';
+import type { HourlySample, ItemMap } from '../lib/types';
 import LatestSnapshot from './LatestSnapshot';
 import ItemTimeline from './ItemTimeline';
-import ModuleHeatmap from './ModuleHeatmap';
+import ModulePieChart from './ModulePieChart';
 import ItemTable from './ItemTable';
 
 interface DashboardProps {
   samples: HourlySample[];
   generatedAt: string;
+  items: ItemMap;
 }
 
-export default function Dashboard({ samples, generatedAt }: DashboardProps) {
+export default function Dashboard({ samples, generatedAt, items }: DashboardProps) {
   const latest = samples[samples.length - 1] ?? null;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      {/* Top: Latest snapshot */}
+    <div className="mx-auto max-w-6xl space-y-8">
+      {/* Latest snapshot — compact top card */}
       {latest && (
         <LatestSnapshot sample={latest} generatedAt={generatedAt} />
       )}
 
-      {/* Charts row */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      {/* Full-width item timeline */}
+      {samples.length > 1 && (
         <ItemTimeline samples={samples} />
-        <ModuleHeatmap samples={samples} />
-      </div>
+      )}
 
-      {/* Item table */}
-      {latest && <ItemTable sample={latest} />}
+      {/* Module pie chart */}
+      {latest && (
+        <ModulePieChart modules={latest.modules} />
+      )}
+
+      {/* Full item list */}
+      {latest && Object.keys(items).length > 0 && (
+        <ItemTable sample={latest} items={items} />
+      )}
     </div>
   );
 }

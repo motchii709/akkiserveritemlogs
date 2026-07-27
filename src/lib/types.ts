@@ -1,3 +1,5 @@
+export type ItemMap = Record<string, number>;
+
 export interface HourlySample {
   ts: string;
   hour: string;
@@ -21,6 +23,13 @@ export interface LatestResponse {
   schema: number;
   generatedAt: string;
   latest: HourlySample | null;
+}
+
+export interface LatestItemsResponse {
+  schema: number;
+  generatedAt: string;
+  latest: HourlySample | null;
+  items: ItemMap;
 }
 
 export interface ManifestResponse {

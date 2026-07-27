@@ -2,11 +2,12 @@
  * Fetch data from GAS at build time and save as static JSON files.
  *
  * Usage:
- *   node scripts/fetch-data.mjs [--output dist/data]
+ *   node scripts/fetch-data.mjs [--output public/data]
  *
  * Outputs:
- *   <output>/latest.json   — GAS /latest response
- *   <output>/history.json  — GAS /history response
+ *   <output>/latest.json   — GAS /latest response (summary)
+ *   <output>/history.json  — GAS /history response (downsampled history)
+ *   <output>/items.json    — GAS /latest-items response (full item map)
  *
  * Requires GAS_ENDPOINT env var or --endpoint flag.
  */
@@ -43,7 +44,7 @@ async function fetchJson(route, params) {
     }
   }
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 60000);
+  const timer = setTimeout(() => controller.abort(), 120000);
   try {
     const res = await fetch(url.toString(), {
       signal: controller.signal,
@@ -62,13 +63,18 @@ async function main() {
   console.log(`Fetching data from ${base}...`);
   await mkdir(outputDir, { recursive: true });
 
-  const latest = await fetchJson('latest');
-  await writeFile(join(outputDir, 'latest.json'), JSON.stringify(latest));
-  console.log(`  latest.json written (${JSON.stringify(latest).length} bytes)`);
-
   const history = await fetchJson('history');
   await writeFile(join(outputDir, 'history.json'), JSON.stringify(history));
   console.log(`  history.json written (${JSON.stringify(history).length} bytes, ${history.samples?.length || 0} samples)`);
+
+  const latestItems = await fetchJson('latest-items');
+  await writeFile(join(outputDir, 'items.json'), JSON.stringify(latestItems));
+  const totalItems = Object.keys(latestItems.items || {}).length;
+  console.log(`  items.json written (${JSON.stringify(latestItems).length} bytes, ${totalItems} items)`);
+
+  const latest = await fetchJson('latest');
+  await writeFile(join(outputDir, 'latest.json'), JSON.stringify(latest));
+  console.log(`  latest.json written (${JSON.stringify(latest).length} bytes)`);
 
   console.log('Done!');
 }
@@ -77,3 +83,4 @@ main().catch((err) => {
   console.error('FATAL:', err.message);
   process.exit(1);
 });
+

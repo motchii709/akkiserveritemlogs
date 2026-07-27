@@ -53,6 +53,9 @@ function doGet(e) {
       case 'latest':
         payload = buildLatest_();
         break;
+      case 'latest-items':
+        payload = buildLatestItems_();
+        break;
       default:
         return jsonResponse({ error: 'unknown route: ' + route }, 400);
     }
@@ -166,7 +169,7 @@ function buildManifest_() {
     sheet: { name: sheet.getName(), gid: SHEET_GID },
     generatedAt: new Date().toISOString(),
     sample: { granularity: 'hourly', strategy: 'last-success-per-hour', topN: TOP_N },
-    routes: ['manifest', 'history', 'delta', 'latest'],
+    routes: ['manifest', 'history', 'delta', 'latest', 'latest-items'],
   };
 }
 
@@ -198,6 +201,42 @@ function buildLatest_() {
       top: top,
       modules: modules,
     },
+  };
+}
+
+/**
+ * 最新スナップショット + 全アイテムリストを返す
+ * アイテムを返却するのでサイズが大きい。静的ビルド専用。
+ */
+function buildLatestItems_() {
+  const all = readAllRows_(null);
+  const hourly = downsampleHourly_(all);
+  if (hourly.length === 0) {
+    return { schema: SCHEMA_VERSION, generatedAt: new Date().toISOString(), latest: null, items: {} };
+  }
+  const latest = hourly[hourly.length - 1];
+  const parsed = parseRawJsonSafe_(latest.snapshot.raw);
+  if (!parsed) {
+    return { schema: SCHEMA_VERSION, generatedAt: new Date().toISOString(), latest: null, items: {} };
+  }
+  // 全アイテムを文字列→数量のオブジェクトとして返す
+  const items = {};
+  for (const k of Object.keys(parsed)) {
+    items[k] = Number(parsed[k]) || 0;
+  }
+  return {
+    schema: SCHEMA_VERSION,
+    generatedAt: new Date().toISOString(),
+    latest: {
+      ts: latest.ts,
+      hour: latest.hour,
+      epochMs: latest.epochMs,
+      unique: Object.keys(parsed).length,
+      total: sumValues_(parsed),
+      top: topEntries_(parsed, TOP_N),
+      modules: sumByModule_(parsed),
+    },
+    items: items,
   };
 }
 
