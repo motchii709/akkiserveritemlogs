@@ -64,17 +64,56 @@ async function main() {
   await mkdir(outputDir, { recursive: true });
 
   const history = await fetchJson('history');
+  const samples = history.samples || [];
   await writeFile(join(outputDir, 'history.json'), JSON.stringify(history));
-  console.log(`  history.json written (${JSON.stringify(history).length} bytes, ${history.samples?.length || 0} samples)`);
+  console.log(`  history.json written (${JSON.stringify(history).length} bytes, ${samples.length} samples)`);
+
+  // Find last valid sample (total > 0) to use when latest is empty
+  let fallback = null;
+  for (let i = samples.length - 1; i >= 0; i--) {
+    if (samples[i].total > 0) {
+      fallback = samples[i];
+      break;
+    }
+  }
 
   const latestItems = await fetchJson('latest-items');
+  const latest = await fetchJson('latest');
+
+  // If GAS returns empty latest, substitute with last valid historical sample
+  if (fallback && (!latest.latest || latest.latest.total === 0)) {
+    latest.latest = {
+      ts: fallback.ts,
+      hour: fallback.hour,
+      epochMs: fallback.epochMs,
+      unique: fallback.unique,
+      total: fallback.total,
+      top: fallback.top,
+      modules: fallback.modules,
+    };
+    latest.generatedAt = history.generatedAt;
+  }
+  if (fallback && Object.keys(latestItems.items || {}).length === 0) {
+    if (fallback.total === 0) {
+      console.warn('  fallback sample also has total=0, items will be empty');
+    }
+  }
+
+  await writeFile(join(outputDir, 'latest.json'), JSON.stringify(latest));
+  console.log(`  latest.json written (${JSON.stringify(latest).length} bytes)`);
+
+  // Patch items.json: use the same fallback's modules as items (approximate)
+  if (fallback && Object.keys(latestItems.items || {}).length === 0 && fallback.total > 0) {
+    // Get the raw items from the same hour's raw_json via history won't work.
+    // But we don't have the raw item map in history. We need to fetch the
+    // raw data for this specific hour. Alternatively, use top items as approximate.
+    // Actually, just leave items.json empty if there's no real data.
+    // The ItemTable won't render if items is empty, which is fine.
+  }
+
   await writeFile(join(outputDir, 'items.json'), JSON.stringify(latestItems));
   const totalItems = Object.keys(latestItems.items || {}).length;
   console.log(`  items.json written (${JSON.stringify(latestItems).length} bytes, ${totalItems} items)`);
-
-  const latest = await fetchJson('latest');
-  await writeFile(join(outputDir, 'latest.json'), JSON.stringify(latest));
-  console.log(`  latest.json written (${JSON.stringify(latest).length} bytes)`);
 
   console.log('Done!');
 }
