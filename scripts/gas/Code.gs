@@ -173,15 +173,22 @@ function buildManifest_() {
   };
 }
 
+function findLastValidSample_(hourly) {
+  for (let i = hourly.length - 1; i >= 0; i--) {
+    const h = hourly[i];
+    if (h.total > 0) return h;
+  }
+  return null;
+}
+
 function buildLatest_() {
   const all = readAllRows_(null);
   const hourly = downsampleHourly_(all);
-  if (hourly.length === 0) {
+  const found = findLastValidSample_(hourly);
+  if (!found) {
     return { schema: SCHEMA_VERSION, generatedAt: new Date().toISOString(), latest: null };
   }
-  // hourly は古い→新しい順。最後のエントリが最新
-  const latest = hourly[hourly.length - 1];
-  const parsed = parseRawJsonSafe_(latest.snapshot.raw);
+  const parsed = parseRawJsonSafe_(found.snapshot.raw);
   if (!parsed) {
     return { schema: SCHEMA_VERSION, generatedAt: new Date().toISOString(), latest: null };
   }
@@ -193,9 +200,9 @@ function buildLatest_() {
     schema: SCHEMA_VERSION,
     generatedAt: new Date().toISOString(),
     latest: {
-      ts: latest.ts,
-      hour: latest.hour,
-      epochMs: latest.epochMs,
+      ts: found.ts,
+      hour: found.hour,
+      epochMs: found.epochMs,
       unique: unique,
       total: total,
       top: top,
@@ -211,15 +218,14 @@ function buildLatest_() {
 function buildLatestItems_() {
   const all = readAllRows_(null);
   const hourly = downsampleHourly_(all);
-  if (hourly.length === 0) {
+  const found = findLastValidSample_(hourly);
+  if (!found) {
     return { schema: SCHEMA_VERSION, generatedAt: new Date().toISOString(), latest: null, items: {} };
   }
-  const latest = hourly[hourly.length - 1];
-  const parsed = parseRawJsonSafe_(latest.snapshot.raw);
+  const parsed = parseRawJsonSafe_(found.snapshot.raw);
   if (!parsed) {
     return { schema: SCHEMA_VERSION, generatedAt: new Date().toISOString(), latest: null, items: {} };
   }
-  // 全アイテムを文字列→数量のオブジェクトとして返す
   const items = {};
   for (const k of Object.keys(parsed)) {
     items[k] = Number(parsed[k]) || 0;
@@ -228,9 +234,9 @@ function buildLatestItems_() {
     schema: SCHEMA_VERSION,
     generatedAt: new Date().toISOString(),
     latest: {
-      ts: latest.ts,
-      hour: latest.hour,
-      epochMs: latest.epochMs,
+      ts: found.ts,
+      hour: found.hour,
+      epochMs: found.epochMs,
       unique: Object.keys(parsed).length,
       total: sumValues_(parsed),
       top: topEntries_(parsed, TOP_N),
